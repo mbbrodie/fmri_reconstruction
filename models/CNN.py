@@ -40,7 +40,7 @@ def create_CNN():
 
 class Miyawaki_CNN:
     '''CNN model for learning Miyawaki fMRI scans'''
-    def init(self, saved_file=None):
+    def __init__(self, saved_file=None):
         if saved_file is None:
             self.model = create_model()
         else:
