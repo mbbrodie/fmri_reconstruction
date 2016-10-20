@@ -3,7 +3,7 @@ import numpy as np
 def gen_img_set(size):
     img_set = []
     for x in range(0,size):
-        img_set.append(generate_img.gen_rand_img())
+        img_set.append(gen_rand_img())
     return np.asarray(img_set)
 
 def gen_rand_img():
