@@ -7,8 +7,12 @@ import nibabel as nib
 
 # Input: 4D array of n brain scans
 def create_eigenbrains(blocks, nii):
-    n_blocks = blocks.shape[0]
-    matrix = flatten_blocks(blocks)
+    n_blocks = blocks.shape[3]
+    matrix = flatten_blocks(blocks, n_blocks)
+    
+    print("NII img shape: " + str(blocks.shape))
+    print("Number of blocks: %d" % (n_blocks))
+    print("Flattened matrix shape: " + str(matrix.shape))
     
     normalized_mtx = mean_std_normalize(matrix)
     normalized_mtx = remove_nan(normalized_mtx)
@@ -22,25 +26,29 @@ def create_eigenbrains(blocks, nii):
     eig_vals, eig_vectors = sort_eig_vectors(eig_vals,eig_vectors)
     
     eig_brains = np.dot(eig_vectors, normalized_mtx)
-    eig_brains = normalize_vectors(eig_brains)
-    
-    eig_brains = eig_brains.reshape(blocks.shape,order='F')
+    #eig_brains = normalize_vectors(eig_brains)
+    eig_brains = unflatten_blocks(eig_brains, blocks.shape)
     eig_brains = eig_brains.astype('float32')
     
-    print(blocks.shape)
-    print(eig_brains[0].shape)
-    print(eig_brains.shape)
+    print("Eigenbrains shape: " + str(eig_brains.shape))
     
     nii_img = nib.Nifti1Image(eig_brains, nii.affine)
     nib.save(nii_img, "eigenbrains.nii.gz")
-    
-    
-    # Glass brain visualization. Looks worse
-    nii_small = nib.Nifti1Image(eig_brains[0], nii.affine)
-    from nilearn import plotting
-    plotting.plot_glass_brain(nii_small)
-    plotting.show()
-   
+    print("Eigenbrains saved to eigenbrains.nii.gz")
+
+
+def flatten_blocks(blocks, n_blocks):
+    matrix = []
+    for x in range(n_blocks):
+        block = blocks[:,:,:,x]
+        matrix.append(block.flatten())
+    return np.asarray(matrix)
+
+def unflatten_blocks(blocks, shape):
+    unflattened = np.empty(shape)
+    for x in range(shape[3]):
+        unflattened[:,:,:,x] = blocks[x].reshape(shape[0:3])
+    return unflattened
     
 def sort_eig_vectors(eig_vals, eig_vectors):
     sort_indexes = eig_vals.argsort()[::-1]   
@@ -55,22 +63,14 @@ def remove_nan(mtx):
     
 def mean_std_normalize(matrix):
     col_means = np.mean(matrix, axis=0)
-    col_std_devs = np.std(matrix, axis=0)  
+    col_std_devs = np.std(matrix, axis=0)
     normalized_mtx = np.true_divide(np.subtract(matrix, col_means), col_std_devs)
-    return normalized_mtx
-    
-def flatten_blocks(blocks):
-    matrix = []
-    for block in blocks:
-        matrix.append(block.flatten())
-    matrix = np.asarray(matrix)
-    return matrix
-    
+    return normalized_mtx 
     
 def scale_to_unit_vector(v):
     norm_v = norm(v)
-    if norm_v == 0: 
-       return v
+    if norm_v == 0:
+        return v
     return np.true_divide(v,norm_v)
 
 def normalize_vectors(mtx):
@@ -79,17 +79,12 @@ def normalize_vectors(mtx):
     return mtx
 
     
-        
 
-    
-#brains = np.asarray([[[[1,1,1],[1,1,1],[1,1,1]],[[1,1,1],[1,1,1],[1,1,1]], [[1,1,1],[1,1,1],[1,1,1]]],[[[0,0,0],[0,0,0],[0,0,0]],[[2,2,2],[2,2,2],[2,2,2]], [[2,2,2],[2,2,2],[2,2,2]]],[[[2,2,2],[2,2,2],[2,2,2]],[[1,1,1],[1,1,1],[1,1,1]], [[0,0,0],[0,0,0],[0,0,0]]],[[[1,1,1],[1,1,1],[1,1,1]],[[1,1,1],[1,1,1],[1,1,1]], [[1,1,1],[1,1,1],[1,1,1]]]])
 
-#path = "../test/filtered_func_data.nii.gz"
-path = "../test/newsirp_final_XML.nii"
+path = "../test/filtered_func_data.nii.gz"
+#path = "../test/newsirp_final_XML.nii"
 nii = nib.load(path)
 brains = nii.get_data()
-#print(nii)
 
-print("\n\n")
 create_eigenbrains(brains, nii)
 
