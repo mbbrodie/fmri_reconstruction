@@ -5,36 +5,41 @@ import math
 import nibabel as nib
 #np.set_printoptions(threshold=np.inf)
 
-# Input: 4D array of n brain scans
-def create_eigenbrains(blocks, nii):
-    n_blocks = blocks.shape[3]
-    matrix = flatten_blocks(blocks, n_blocks)
+# Input: list of paths to NII files, 4D array of n brain scans, example NII image
+def create_eigenbrains(file_paths, blocks, nii):
     
-    print("NII img shape: " + str(blocks.shape))
+    matrix, n_blocks = load_and_flatten(file_paths)
+    
+    #print("NII img shape: " + str(blocks.shape))
     print("Number of blocks: %d" % (n_blocks))
     print("Flattened matrix shape: " + str(matrix.shape))
     
-    normalized_mtx = mean_std_normalize(matrix)
+    normalized_mtx, col_means, col_std_devs = mean_std_normalize_matrix(matrix)
     normalized_mtx = remove_nan(normalized_mtx)
     
     # Z^t by Z covariance matrix, but will be huge for MRI data (# voxels in a block, squared)
-    #covariance_mtx = np.true_divide(np.dot(normalized_mtx.transpose(), normalized_mtx), n_blocks-1)
+    # covariance_mtx = np.true_divide(np.dot(normalized_mtx.transpose(), normalized_mtx), n_blocks-1)
     # Covariance matrix Zhang et al. used, smaller size (n_blocks squared)
     covariance_mtx = np.true_divide(np.dot(normalized_mtx, normalized_mtx.transpose()), n_blocks-1)
     
     eig_vals, eig_vectors = eig(covariance_mtx)
     eig_vals, eig_vectors = sort_eig_vectors(eig_vals,eig_vectors)
     
-    eig_brains = np.dot(eig_vectors, normalized_mtx)
-    #eig_brains = normalize_vectors(eig_brains)
-    eig_brains = unflatten_blocks(eig_brains, blocks.shape)
-    eig_brains = eig_brains.astype('float32')
+    eig_vectors = np.dot(eig_vectors, normalized_mtx)
+    eig_vectors = normalize_vectors(eig_vectors)
+    #print("Normalized Matrix Shape: " + str(normalized_mtx.shape))
+    print(eig_vectors.shape)
+    print (col_means.shape)
     
-    print("Eigenbrains shape: " + str(eig_brains.shape))
+    return project_matrix_onto_eigspace(normalized_mtx, eig_vectors), eig_vectors, col_means, col_std_devs
+    # eig_brains = unflatten_blocks(eig_brains, blocks.shape)
+    # eig_brains = eig_brains.astype('float32')
     
-    nii_img = nib.Nifti1Image(eig_brains, nii.affine)
-    nib.save(nii_img, "eigenbrains.nii.gz")
-    print("Eigenbrains saved to eigenbrains.nii.gz")
+    # print("Eigenbrains shape: " + str(eig_brains.shape))
+    
+    # nii_img = nib.Nifti1Image(eig_brains, nii.affine)
+    # nib.save(nii_img, "/home/wesack/eigenbrains/eigenbrain_random_run20.nii.gz")
+    # print("Eigenbrains saved to eigenbrains.nii.gz")
 
 
 def flatten_blocks(blocks, n_blocks):
@@ -60,12 +65,36 @@ def remove_nan(mtx):
     nan = np.isnan(mtx)
     mtx[nan] = 0
     return mtx
+
+def mean_std_normalize(matrix, col_means, col_std_devs):
+    normalized_mtx = np.true_divide(np.subtract(matrix, col_means), col_std_devs)
+    normalized_mtx = remove_nan(normalized_mtx)
+    return normalized_mtx
     
-def mean_std_normalize(matrix):
+def mean_std_normalize_matrix(matrix):
     col_means = np.mean(matrix, axis=0)
     col_std_devs = np.std(matrix, axis=0)
     normalized_mtx = np.true_divide(np.subtract(matrix, col_means), col_std_devs)
-    return normalized_mtx 
+    normalized_mtx = remove_nan(normalized_mtx)
+    return normalized_mtx, col_means, col_std_devs
+
+def mean_std_normalize_vector(vector, col_means, col_std_devs):
+    normalized_mtx = np.true_divide(np.subtract(matrix, col_means), col_std_devs)
+    normalized_mtx = remove_nan(normalized_mtx)
+    return normalized_mtx
+
+def project_vector_onto_eigspace(vector, eig_vectors):
+    projection = []
+    for eig_vec in eig_vectors:
+        weight = np.dot(eig_vec.transpose(), vector)
+        projection.append(weight)
+    return np.asarray(projection)
+
+def project_matrix_onto_eigspace(matrix, eig_vectors):
+    new_matrix = []
+    for vector in matrix:
+        new_matrix.append(project_vector_onto_eigspace(vector, eig_vectors))
+    return np.asarray(new_matrix)
     
 def scale_to_unit_vector(v):
     norm_v = norm(v)
@@ -78,13 +107,29 @@ def normalize_vectors(mtx):
         v = scale_to_unit_vector(v)
     return mtx
 
+def load_and_flatten(file_paths):
+    matrix = None
+    n_blocks = 0
+    
+    for path in file_paths:
+        my_nii = nib.load(path)
+        scans = my_nii.get_data()
+        block_count = scans.shape[3]
+        n_blocks += block_count
+        
+        if matrix is None:
+            matrix = flatten_blocks(scans, block_count)
+        else:
+            matrix = np.concatenate([matrix, flatten_blocks(scans, block_count)])
+    return matrix, n_blocks
+
     
 
 
-path = "../test/filtered_func_data.nii.gz"
+#paths= ["/home/wesack/nilearn_data/miyawaki2008/func/data_figure_run09.nii.gz", "/home/wesack/nilearn_data/miyawaki2008/func/data_random_run09.nii.gz"]
 #path = "../test/newsirp_final_XML.nii"
-nii = nib.load(path)
-brains = nii.get_data()
+#nii = nib.load(path)
+#brains = nii.get_data()
 
-create_eigenbrains(brains, nii)
+#create_eigenbrains(paths, None, None)
 
