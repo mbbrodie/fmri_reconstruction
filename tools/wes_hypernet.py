@@ -9,7 +9,7 @@ from pprint import pprint
 from tensorflow.examples.tutorials.mnist import input_data
 import tensorflow as tf
 FLAGS = None
-
+ 
 def reduce_train_data(data):
   '''only keeps the first 100 examples of every class in the train set'''
   train = data.train
@@ -64,7 +64,7 @@ def main(_):
   else:
     W = tf.get_variable('W',[784,2048],initializer=tf.truncated_normal_initializer(stddev=0.01))
   b = tf.Variable(tf.zeros([2048]))
-  y1 = tf.sigmoid(tf.matmul(x, W) + b)
+  y1 = tf.tanh(tf.matmul(x, W) + b)
 
   W2 = tf.Variable(tf.zeros([2048, 10]))
   b2 = tf.Variable(tf.zeros([10]))
@@ -83,7 +83,8 @@ def main(_):
   # So here we use tf.nn.softmax_cross_entropy_with_logits on the raw
   # outputs of 'y', and then average across the batch.
   cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y, y_))
-  train_step = tf.train.GradientDescentOptimizer(0.5).minimize(cross_entropy)
+  #train_step = tf.train.GradientDescentOptimizer(0.5).minimize(cross_entropy)
+  train_step = tf.train.RMSPropOptimizer(0.1).minimize(cross_entropy)
   sess = tf.InteractiveSession()
   # Train
   tf.initialize_all_variables().run()
