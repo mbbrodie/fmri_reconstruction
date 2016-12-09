@@ -8,9 +8,8 @@ import nibabel as nib
 # Input: list of paths to NII files, 4D array of n brain scans, example NII image
 def create_eigenbrains(file_paths, blocks, nii):
     
-    matrix, n_blocks = load_and_flatten(file_paths)
+    matrix, n_blocks, shape = load_and_flatten(file_paths)
     
-    #print("NII img shape: " + str(blocks.shape))
     print("Number of blocks: %d" % (n_blocks))
     print("Flattened matrix shape: " + str(matrix.shape))
     
@@ -53,6 +52,8 @@ def unflatten_blocks(blocks, shape):
     unflattened = np.empty(shape)
     for x in range(shape[3]):
         unflattened[:,:,:,x] = blocks[x].reshape(shape[0:3])
+        
+    unflattened = unflattened.astype('float32')
     return unflattened
     
 def sort_eig_vectors(eig_vals, eig_vectors):
@@ -94,7 +95,37 @@ def project_matrix_onto_eigspace(matrix, eig_vectors):
     new_matrix = []
     for vector in matrix:
         new_matrix.append(project_vector_onto_eigspace(vector, eig_vectors))
-    return np.asarray(new_matrix)
+    return np.asarray(new_matrix)    
+
+def recreate_blocks(eigspace_blocks, eig_vectors, shape):
+    blocks = []
+    for eb in eigspace_blocks:
+        sum_vec = None
+        index = 0
+        for eb_entry in eb:
+            addition = np.multiply(eig_vectors[index], eb_entry)
+            if sum_vec is None:
+                sum_vec = addition
+            else:
+                sum_vec = np.add(sum_vec, addition)
+            index = index + 1
+        blocks.append(sum_vec)
+    return np.asarray(blocks)
+
+def recreate_blocks2(eb, eig_vectors, shape):
+    blocks = []
+
+    sum_vec = None
+    index = 0
+    for eb_entry in eb:
+        addition = np.multiply(eig_vectors[index], eb_entry)
+        if sum_vec is None:
+            sum_vec = addition
+        else:
+            sum_vec = np.add(sum_vec, addition)
+        index = index + 1
+    blocks.append(sum_vec)
+    return np.asarray(blocks)
     
 def scale_to_unit_vector(v):
     norm_v = norm(v)
@@ -114,6 +145,7 @@ def load_and_flatten(file_paths):
     for path in file_paths:
         my_nii = nib.load(path)
         scans = my_nii.get_data()
+        shape = scans.shape
         block_count = scans.shape[3]
         n_blocks += block_count
         
@@ -121,7 +153,18 @@ def load_and_flatten(file_paths):
             matrix = flatten_blocks(scans, block_count)
         else:
             matrix = np.concatenate([matrix, flatten_blocks(scans, block_count)])
-    return matrix, n_blocks
+    return matrix, n_blocks, shape
+
+def get_affine(paths):
+    my_nii_path = paths[0]
+    nii = nib.load(my_nii_path)
+    return nii.affine
+
+def save_nii(blocks, affine, filename):
+    nii_img = nib.Nifti1Image(blocks, affine)
+    nib.save(nii_img, filename)
+
+
 
     
 
