@@ -74,6 +74,7 @@ def main(_):
     #b_hyp = tf.get_variable('b2ab',[2048], initializer=tf.constant_initializer(0.0)) 
     #W = tf.matmul(w_hyp, w2_hyp) + b_hyp
     
+    # Hypernet vectors broken down into combination of smallest possible vectors
     # Creating left mtx (of final mtx multiply)
     W_left1 = create_hypernet_layer(2,2,'w_hyp','w_hyp2','b_hyp1',[4,1])
     
